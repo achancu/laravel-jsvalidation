@@ -56,14 +56,14 @@ $.extend(true, laravelValidation, {
          */
         hasNumericRules: function (element) {
 
-            var numericRules = ['Numeric', 'Integer'];
+            var numericRules = ['laravelNumeric', 'laravelInteger'];
             var found = false;
 
             var validator = $.data(element.form, "validator");
             var objRules = validator.settings.rules[element.name];
 
             for (var i = 0; i < numericRules.length; i++) {
-                found = found || $.grep(objRules, function(rule) { return $.inArray(numericRules[i], rule); });
+                found = found || numericRules[i] in objRules;
             }
 
             return found;
