@@ -48,24 +48,15 @@ class Validator extends BaseValidator
      */
     protected function generateJavascriptValidations()
     {
-        // Check if JS Validation is disabled for this attribute
-        $vAttributes = array_filter(array_keys($this->rules), [$this, 'jsValidationEnabled']);
-        $vRules = array_intersect_key($this->rules, array_flip($vAttributes));
+        $jsValidations = array();
 
-        // Convert each rules and messages
-        $convertedRules = array_map([$this, 'jsConvertRules'], array_keys($vRules), $vRules);
+        foreach ($this->rules as $attribute=>$rules)
+        {
+            $newRules=$this->jsConvertRules($attribute,$rules);
+            $jsValidations = array_merge($jsValidations, $newRules);
+        }
 
-        $convertedRules = array_filter($convertedRules, function ($value) {
-            return !empty($value['rules']);
-        });
-        // Format results
-        return array_reduce($convertedRules, function ($result, $item) {
-            $attribute = $item['attribute'];
-            $rule = $item['rules'];
-            $result[$attribute] = (empty($result[$attribute])) ? array() : $result[$attribute];
-            $result[$attribute] = array_merge($result[$attribute], $rule);
-            return $result;
-        }, array());
+        return $jsValidations;
     }
 
     /**
@@ -78,25 +69,22 @@ class Validator extends BaseValidator
      */
     protected function jsConvertRules($attribute, $rules)
     {
-        $jsRules = [];
-        $jsAttribute = $attribute;
+        if (!$this->jsValidationEnabled($attribute)) return array();
 
+        $jsRules = [];
         foreach ($rules as $rawRule) {
             list($rule, $parameters) = $this->parseRule($rawRule);
             list($jsAttribute, $jsRule, $jsParams) = $this->getJsRule($attribute, $rule, $parameters);
             if ($jsRule) {
-                $jsRules[$jsRule][] = array(
-                    $rule, $jsParams,
+                $jsRules[$jsAttribute][$jsRule][] = array(
+                    $rule,
+                    $jsParams,
                     $this->getJsMessage($attribute, $rule, $parameters),
                     $this->isImplicit($rule),
                 );
             }
         }
-
-        return array(
-            'attribute' => $jsAttribute,
-            'rules' => $jsRules,
-        );
+        return $jsRules;
     }
 
     /**
@@ -112,6 +100,7 @@ class Validator extends BaseValidator
     {
         $method = "jsRule{$rule}";
         $jsRule = false;
+        $attribute = $this->getAttributeName($attribute);
 
         if ($this->isRemoteRule($rule)) {
             list($attribute, $parameters) = $this->jsRemoteRule($attribute);
@@ -201,6 +190,22 @@ class Validator extends BaseValidator
             'rules' => $jsValidations,
             'messages' => $jsMessages,
         ];
+    }
+
+    /**
+     * Handles multidimensional attribute names
+     *
+     * @param $attribute
+     * @return string
+     */
+    private function getAttributeName($attribute)
+    {
+        $attributeArray = explode(".", $attribute);
+        if(count($attributeArray) > 1) {
+            return $attributeArray[0] . "[".implode("][", array_slice($attributeArray, 1)) . "]";
+        }
+
+        return $attribute;
     }
 
 
